@@ -1,0 +1,3 @@
+module MorseBuddy();
+
+endmodule
