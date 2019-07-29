@@ -1,456 +1,760 @@
+
 //TODO: Change the counter duration for Morse Input
 //Connect everything
-module MorseBuddy(CLOCK_50, KEY, SW, LEDR);
-	input CLOCK_50;
-	input [3:0] KEY;
-	input [9:0] SW;
-	output [9:0] LEDR;
-	wire reset, clk, keyIn, startSubCont;
-	wire[5:0] seed;
-	assign seed = SW[5:0]; //note: seed currently does nothing
-	assign clk = CLOCK_50;
-	assign reset = KEY[0];
-	assign keyIn = KEY[1];
-	assign startSubCont = KEY[3];
-	// wire keyPressed;
-	// wire [7:0] keyCode;
-	// keyboard_handler keyboard0(clk, reset, PS2_CLK, PS2_DAT,keyPressed, keyCode);
+module MorseBuddy(CLOCK_50, KEY, SW, LEDR, HEX0, HEX1, HEX2, HEX3, VGA_CLK,                           //  VGA Clock
+        VGA_HS,                         //  VGA H_SYNC
+        VGA_VS,                         //  VGA V_SYNC
+        VGA_BLANK_N,                    //  VGA BLANK
+        VGA_SYNC_N,                     //  VGA SYNC
+        VGA_R,                          //  VGA Red[9:0]
+        VGA_G,                          //  VGA Green[9:0]
+        VGA_B                           //  VGA Blue[9:0]
+    );
+    input CLOCK_50;
+    input [3:0] KEY;
+    input [9:0] SW;
+    output [9:0] LEDR;
+    wire reset, clk, keyIn, proceed, mode;
+    wire[5:0] seed;
+    assign seed = SW[5:0];
+    assign clk = CLOCK_50;
+    assign reset = KEY[0];
+    assign keyIn = KEY[1];
+    assign proceed = KEY[3];
+    assign mode = SW[9]; // 0 = text --> morse, 1 = morse --> text
+    output[6:0] HEX0, HEX1, HEX2, HEX3;
+    output      VGA_CLK;    //  VGA Clock
+    output      VGA_HS;     //  VGA H_SYNC
+    output      VGA_VS;     //  VGA V_SYNC
+    output      VGA_BLANK_N; // VGA BLANK
+    output      VGA_SYNC_N;  // VGA SYNC
+    output [9:0] VGA_R;     //  VGA Red[9:0]
+    output [9:0] VGA_G;     //  VGA Green[9:0]
+    output [9:0] VGA_B;     //  VGA Blue[9:0]
+    // wire keyPressed;
+    // wire [7:0] keyCode;
+    // keyboard_handler keyboard0(clk, reset, PS2_CLK, PS2_DAT,keyPressed, keyCode);
 
-	wire [5:0] letterCode, fixedLetterCode;
-	wire pollLetter, morseEn, letterDisp, checkAnswer, validationDone, correct;
-	wire resetDatapath;
+    wire[2:0] colour;
+    wire[7:0] x;
+    wire[6:0] y;
+    wire resetDatapath, generateLetters, displayLetters, morseInput, resetMorseInput, resetMorseMod,doneGeneratingLetters, doneDrawLetters, finishedAllVerification, correct, verify;
+    wire[9:0] morseIn;
+	wire[9:0] curLetterCode;
+    datapath datapath0(
+        clk, 
+        resetDatapath, 
+        generateLetters,
+        displayLetters,
+        morseInput,
+        resetMorseInput,
+        resetMorseMod,
+        keyIn,
+        proceed,
+        verify,
+        seed,
 
-	datapath data0(clk, resetDatapath, keyIn, letterCode, pollLetter, morseEn, letterDisp, checkAnswer, validationDone, correct, fixedLetterCode);
-	control c0(clk, reset, seed, startSubCont, startSubCont, validationDone, correct, startSubCont, pollLetter, morseEn, letterDisp, letterCode, checkAnswer, resetDatapath);
-	assign LEDR = {correct, 3'b000, fixedLetterCode};
+        doneGeneratingLetters,
+        doneDrawLetters,
+        finishedAllVerification,
+        correct,
+        x,
+        y,
+        colour,
+        morseIn,
+		curLetterCode
+        ); 
+
+    control control0(
+        clk, 
+        reset, 
+        proceed,
+        mode,
+        doneGeneratingLetters,
+        doneDrawLetters,
+        finishedAllVerification,
+        correct,
+
+        generateLetters,
+        morseInput,
+        displayLetters,
+        resetDatapath,
+        resetMorseInput,
+        verify,
+        resetMorseMod
+        );    
+   	assign LEDR = curLetterCode;
+
+   	hex_decoder hex0(morseIn[3:0], HEX0);
+   	hex_decoder hex1(morseIn[7:4], HEX1);
+   	hex_decoder hex2({2'b00,morseIn[9:8]}, HEX2);
+	hex_decoder hex3({3'b000,correct}, HEX3);
+	// vga_adapter VGA(
+ //            .resetn(reset),
+ //            .clock(CLOCK_50),
+ //            .colour(colour),
+ //            .x(x),
+ //            .y(y),
+ //            .plot(morseInput),
+ //            /* Signals for the DAC to drive the monitor. */
+ //            .VGA_R(VGA_R),
+ //            .VGA_G(VGA_G),
+ //            .VGA_B(VGA_B),
+ //            .VGA_HS(VGA_HS),
+ //            .VGA_VS(VGA_VS),
+ //            .VGA_BLANK(VGA_BLANK_N),
+ //            .VGA_SYNC(VGA_SYNC_N),
+ //            .VGA_CLK(VGA_CLK));
+ //        defparam VGA.RESOLUTION = "160x120";
+ //        defparam VGA.MONOCHROME = "FALSE";
+ //        defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
+ //        defparam VGA.BACKGROUND_IMAGE = "black.mif";
 endmodule
 
-module displayLetter(clk, reset, displayEn, letterCode);
-	input clk, reset, displayEn;
-	input[5:0] letterCode;
-	//TODO: Connect this
+module morseCounter(clk, reset, endDraw);
+    input clk, reset;
+    output endDraw;
+    reg[3:0] q;
+    always @(posedge clk) begin
+        if (!reset) begin
+            q <= 4'd14;
+        end
+        else begin
+            q <= q - 1'b1;
+        end
+    end
+    assign endDraw = q == 1'b0 ? 1'b1 : 1'b0;
 endmodule
 
-module datapath(clk, reset, keyIn, letterCode, pollLetter, morseEn, letterDisp, checkAnswer, validationDone, correct, fixedLetterCode);
-	input clk, reset, keyIn, pollLetter, morseEn, letterDisp, checkAnswer;
-	input[5:0] letterCode;
-	output reg validationDone, correct;
-	wire [9:0] morseIn;
-	output reg[5:0] fixedLetterCode;
-	wire [7:0] scanCode;
-
-	wire[9:0] validMorse;
-	encodingToScanLUT es0(fixedLetterCode, scanCode);
-	scanToMorseLUT sm0(scanCode, validMorse);
-
-	inputHandler i0(clk, reset, keyIn, morseEn, morseIn);
-	displayLetter d0(clk, reset, letterDisp, fixedLetterCode);
-	always @(posedge clk) begin
-		if(!reset) begin
-			fixedLetterCode <= 6'd0; //NOTE: invalid code
-			validationDone <= 1'b0;
-			correct <= 1'b0;
-		end
-		else begin
-			if (pollLetter) fixedLetterCode <= letterCode; 
-			if (checkAnswer) begin
-				if (validMorse == morseIn) correct <= 1'b1;
-				else correct <= 1'b0;
-				validationDone <= 1'b1;
-			end
-		end
-	end
+module displayMorse(clk, reset, morseCode, x, y, done, colour);
+    input clk, reset;
+    input[9:0] morseCode;
+    output reg[7:0] x;
+    output reg[6:0] y;
+    output done;
+    output reg[2:0] colour;
+    reg[9:0] codeToDraw;
+    reg[1:0] currentDraw;
+    reg whichBit;
+    morseCounter mc0(clk, reset, done);
+  
+    reg[7:0] nextX;
+    reg[2:0] nextColour;
+    always @(*) begin
+        currentDraw <= codeToDraw[9:8];
+    end
+    always @(posedge clk) begin
+        if (!reset) begin
+            nextX <= 8'd10;
+            y <= 7'd10;
+            codeToDraw <= morseCode;
+            whichBit <= 1'b0;
+            nextColour <= 3'd0;
+        end
+        else begin
+            case(currentDraw)
+                2'b00: nextColour <= 3'b000;
+                2'b10: begin
+                    if(!whichBit) nextColour <= 3'b000;
+                    else nextColour <= 3'b111;
+                end
+                2'b11: nextColour <= 3'b100;
+                default: nextColour <= 3'b000;
+            endcase
+            if(whichBit == 1'b1) begin
+                codeToDraw <= codeToDraw << 2;
+                
+                nextX <= x+ 1'b1;
+                whichBit <= 1'b0;
+            end
+            else begin
+                nextX<= x+2'd3;
+                whichBit <= 1'b1;
+            end
+        end
+    end
+    always @(posedge clk) begin
+        x <= nextX;
+        colour <= nextColour;
+    end
 endmodule
+
+module datapath(
+    clk, reset, generateLetters, displayLetters, morseInput, resetMorseInput, resetMorseMod, keyIn, proceed, verify, seed,
+    doneGeneratingLetters, doneDrawLetters, finishedAllVerification, correct, x, y, colour, morseIn, curLetterCode
+    );
+    parameter numLetters = 5;
+    parameter numLetterBits = numLetters * 10;
+    input clk, reset, generateLetters, displayLetters, morseInput, resetMorseInput, resetMorseMod, proceed, verify, keyIn;
+    input[5:0] seed;
+    output reg doneGeneratingLetters, doneDrawLetters;
+    output finishedAllVerification, correct;
+    output [7:0] x;
+    output [6:0] y;
+    output [2:0] colour;
+    output [9:0] morseIn;
+    output [9:0] curLetterCode;
+    reg [numLetterBits-1:0] morseCodes;
+    reg [numLetters-1:0] lettersToGenerate;
+    wire [5:0] letterCode;
+    wire valid;
+    wire [7:0] scanCode;
+    wire [9:0] morseCode;
+    generateRandomLetter genRandLetter0(clk, reset, seed, letterCode, valid);
+    encodingToScanLUT enToScan0(letterCode, scanCode);
+    scanToMorseLUT scToMo0(scanCode, morseCode);
+    wire [3:0] lettersRemaining;
+    morseMatch morMatch0(clk, reset & resetMorseMod, morseCodes, keyIn, morseInput, resetMorseInput, verify, correct, finishedAllVerification, morseIn, lettersDone);
+    wire[numLetterBits-1:0] shiftedMorseCodes;
+    assign shiftedMorseCodes = (morseCodes << 10 *lettersDone);
+    assign curLetterCode = shiftedMorseCodes[numLetterBits-1:numLetterBits-10];
+	wire done;
+    displayMorse displayMorse0(clk, &{keyIn, reset, morseIn}, morseIn, x, y, done, colour);
+    always @(posedge clk) begin
+        if (~reset) begin
+            morseCodes <= {numLetterBits{1'b0}};
+            lettersToGenerate <= numLetters-1'b1;
+            doneGeneratingLetters <= 1'b0;
+            doneDrawLetters <= 1'b0;
+        end
+        else begin
+            if(generateLetters) begin
+                if(valid) begin
+                    morseCodes <= morseCodes | (morseCode << 10 * lettersToGenerate);
+                    if(lettersToGenerate == 1'b0) begin
+                        doneGeneratingLetters <= 1'b1;
+                        doneDrawLetters <= 1'b1; //CHANGE THIS
+                    end
+                    else begin
+                        lettersToGenerate <= lettersToGenerate - 1'b1;    
+                    end
+                end
+            end
+        end
+    end
+endmodule
+
+
+module morseMatch(clk, reset, morseCodes, keyIn, enableInput, resetInput, verify, correct, finishedAllVerification, morseIn, lettersRemaining);
+    parameter numLetters = 5;
+    parameter numLetterBits = numLetters * 10;
+    input clk, reset, keyIn, enableInput, resetInput, verify;
+    input [numLetterBits-1:0] morseCodes;
+    output correct, finishedAllVerification;
+    output reg[3:0] lettersRemaining;
+    reg[numLetterBits-1:0] curMorse;
+    output[9:0] morseIn;
+    assign finishedAllVerification = curMorse == {numLetterBits{1'b0}};
+    inputHandler morseIn0(clk, resetInput & reset, keyIn, enableInput, morseIn);
+    assign correct = curMorse[numLetterBits-1:numLetterBits-10] == morseIn;
+    always @(posedge clk) begin
+        if (~reset) begin
+            curMorse <= morseCodes;
+            lettersRemaining <= 4'd0;
+        end
+        else if(verify & correct) begin
+            curMorse <= curMorse << 10;
+            lettersRemaining <= lettersRemaining + 1'b1;
+        end
+    end
+endmodule
+
 
 
 module control(
-	clk, reset, seed, start, submit, validationDone, correct, continue, 
-	pollLetter, enableMorse, displayLetter, letterCode, checkAnswer, resetDatapath
-	);
-	input clk, reset, start, submit, validationDone, correct, continue;
-	input[5:0] seed;
-	output reg pollLetter, enableMorse, displayLetter, checkAnswer, resetDatapath;
-	output [5:0] letterCode;
-	localparam 
-		START = 4'd0,
-		START_WAIT = 4'd1,
-		RESET = 4'd2,
-		GENERATE_LETTER = 4'd3,
-		DISPLAY_LETTER = 4'd4,
-		MORSE_INPUT = 4'd5,
-		MORSE_WAIT = 4'd6,
-		SUBMIT = 4'd7,
-		END = 4'd8;
+    clk, reset, proceed, mode, doneGeneratingLetters, doneDrawLetters, finishedAllVerification, correct,
+    generateLetters, morseInput, displayLetters, resetDatapath, resetMorseInput, verify, resetMorseMod
+    );
+    input clk, reset, proceed, mode, doneGeneratingLetters, doneDrawLetters, finishedAllVerification, correct;
+    output reg generateLetters, morseInput, displayLetters, resetDatapath, resetMorseInput, verify, resetMorseMod;
 
-	reg[3:0] current_state, next_state;
 
-	wire validLetter;
-	generateRandomLetter r0(clk, reset, seed, letterCode, validLetter); 
-	always @(*) begin
-		case(current_state)
-			START: next_state <= start ? START: START_WAIT;
-			START_WAIT: next_state <= start ? RESET: START_WAIT;
-			RESET: next_state <= GENERATE_LETTER;
-			GENERATE_LETTER: next_state <= validLetter ? DISPLAY_LETTER : GENERATE_LETTER;
-			DISPLAY_LETTER: next_state <= MORSE_INPUT;
-			MORSE_INPUT: next_state <= submit ? MORSE_INPUT: MORSE_WAIT;
-			MORSE_WAIT: next_state <= submit ? SUBMIT : MORSE_WAIT;
-			// SUBMIT: next_state <= validationDone ? (correct ? CORRECT: INCORRECT) : SUBMIT;
-			SUBMIT: next_state <= validationDone ? END : SUBMIT;
-			END: next_state <= continue ? END : START;
-		endcase
-	end
+    localparam
+        START = 4'd0,
+        START_WAIT = 4'd1,
+        GENERATE_LETTERS = 4'd2,
+        GENERATE_MORSE = 4'd3,
+        DISPLAY_LETTERS = 4'd4,
+        RESET_MORSE_MODULE = 4'd5,
+        RESET_MORSE_INPUT = 4'd6,
+        MORSE_INPUT = 4'd7,
+        VERIFY_WAIT = 4'd8,
+        VERIFY = 4'd9,
+        FINISH = 4'd10,
+        FINISH_WAIT = 4'd11;
 
-	always @(*) begin
-		pollLetter <= 1'b0;
-		enableMorse <= 1'b0;
-		displayLetter <= 1'b0;
-		checkAnswer <= 1'b0;
-		resetDatapath <= 1'b1;
-		case(current_state)
-			START: resetDatapath <= 1'b0;
-			START_WAIT: resetDatapath <= 1'b0;
-			GENERATE_LETTER: pollLetter <= 1'b1;
-			DISPLAY_LETTER: displayLetter <= 1'b1;
-			MORSE_INPUT: enableMorse <= 1'b1;
-			SUBMIT: begin
-				checkAnswer <= 1'b1;
-				enableMorse <= 1'b1;
-			end
-		endcase
-	end
-	
-	always @(posedge clk) begin
-		$display("State: %4b", next_state);
-		if (!reset) begin
-			current_state <= START;
-		end
-		else begin
-			current_state <= next_state;
-		end
-	end
+    reg[3:0] current_state, next_state;
+
+    always @(*) begin
+        case(current_state)
+            START             : next_state <= proceed ? START: START_WAIT;
+            START_WAIT        : next_state <= proceed ? ( mode ? GENERATE_MORSE : GENERATE_LETTERS ) : START_WAIT;
+            GENERATE_LETTERS   : next_state <= doneGeneratingLetters ? DISPLAY_LETTERS : GENERATE_LETTERS;
+            DISPLAY_LETTERS    : next_state <= doneDrawLetters ? RESET_MORSE_MODULE: DISPLAY_LETTERS;
+            RESET_MORSE_MODULE: next_state <= RESET_MORSE_INPUT;
+            RESET_MORSE_INPUT : next_state <= MORSE_INPUT;
+            MORSE_INPUT       : next_state <= proceed ? MORSE_INPUT : VERIFY_WAIT;
+            VERIFY_WAIT : next_state <= proceed ? VERIFY: VERIFY_WAIT;
+            VERIFY : next_state <= correct ? (finishedAllVerification ? FINISH : RESET_MORSE_INPUT) : RESET_MORSE_INPUT;
+            FINISH : next_state <= proceed ? FINISH : FINISH_WAIT;
+            FINISH_WAIT: next_state <= proceed ? START : FINISH_WAIT;
+				default: next_state <= START;
+        endcase
+    end
+    always @(*) begin
+        generateLetters <= 1'b0;
+        morseInput <= 1'b0;
+        displayLetters <= 1'b0;
+        resetDatapath <= 1'b1;
+        resetMorseInput <= 1'b1;
+        resetMorseMod <= 1'b1;
+        verify <= 1'b0;
+        case(current_state)
+            START: resetDatapath <= 1'b0;
+            START_WAIT: resetDatapath <= 1'b0;
+            GENERATE_LETTERS: generateLetters <= 1'b1;
+            DISPLAY_LETTERS: displayLetters <= 1'b1;
+            RESET_MORSE_MODULE: resetMorseMod <= 1'b0;
+            RESET_MORSE_INPUT: resetMorseInput <= 1'b0;
+            MORSE_INPUT: morseInput <= 1'b1;
+            VERIFY: verify <= 1'b1;
+        endcase
+    end
+    
+    always @(posedge clk) begin
+        if (!reset) begin
+            current_state <= START;
+        end
+        else begin
+            current_state <= next_state;
+        end
+    end
 endmodule
 
-
 module inputHandler(clk, reset, keyIn, enable, curCode);
-	input clk, reset, keyIn, enable;
-	output reg[9:0] curCode; //5 2-bit seminibbles (10 = dot, 11 = dash)
-	reg[2:0] semiNibblesUsed;
-	wire dot, dash;
-	reg[3:0] position;
+    input clk, reset, keyIn, enable;
+    output reg[9:0] curCode; //5 2-bit seminibbles (10 = dot, 11 = dash)
+    reg[2:0] semiNibblesUsed;
+    wire dot, dash;
+    reg[3:0] position;
 
-	MorseInput m0 (clk, reset, keyIn, dot, dash);
-	always @(*) begin
-		position <= 4'd9 - semiNibblesUsed * 2;
-	end
+    MorseInput m0 (clk, reset, keyIn, dot, dash);
+    always @(*) begin
+        position <= 4'd9 - semiNibblesUsed * 2'd2;
+    end
 
-	always @(posedge clk) begin
-		// $display("Enable: %b", enable);
-		// $display("Dash: %b", dash);
-		if (!reset) begin
-			semiNibblesUsed <= 3'd0;
-			curCode    <= 10'd0;
-		end
-		else if(enable) begin
-			if (dot) begin
-				if(semiNibblesUsed < 3'd5) begin
-					curCode[position] <= 1'b1;
-					curCode[position-1'b1] <= 1'b0;
-					semiNibblesUsed <= semiNibblesUsed + 1'b1;
-				end
-				else begin //need to overwrite values
-					curCode = curCode << 2;
-					curCode[1:0] <= 2'b10;
-				end
-			end
-			else if (dash) begin
-				if(semiNibblesUsed < 3'd5) begin
-					curCode[position] <= 1'b1;
-					curCode[position-1'b1] <= 1'b1;
-					semiNibblesUsed <= semiNibblesUsed + 1'b1;
-				end
-				else begin //need to overwrite values
-					curCode = curCode << 2;
-					curCode[1:0] <= 2'b11;
-				end
-			end
-		end
-	end
+    always @(posedge clk or negedge reset) begin
+        if (!reset) begin
+            semiNibblesUsed <= 3'd0;
+            curCode <= 10'd0;
+        end
+        else if(enable) begin
+            if (dot) begin
+                if(semiNibblesUsed < 3'd5) begin
+                    curCode[position] <= 1'b1;
+                    curCode[position-1'b1] <= 1'b0;
+                    semiNibblesUsed <= semiNibblesUsed + 1'b1;
+                end
+                else begin //need to overwrite values
+                    curCode = curCode << 2;
+                    curCode[1:0] <= 2'b10;
+                end
+            end
+            else if (dash) begin
+                if(semiNibblesUsed < 3'd5) begin
+                    curCode[position] <= 1'b1;
+                    curCode[position-1'b1] <= 1'b1;
+                    semiNibblesUsed <= semiNibblesUsed + 1'b1;
+                end
+                else begin //need to overwrite values
+                    curCode = curCode << 2;
+                    curCode[1:0] <= 2'b11;
+                end
+            end
+        end
+    end
 endmodule
 
 // this really does not work at the moment
 module LFSR(clk, reset, seed, out); //6-bit Fibonacci LFSR
-	input clk, reset;
-	input[5:0] seed;
-	output reg[5:0] out;
-	reg[5:0] bit;
-
-	//Feedback polynomial: x^6 + x^5 + 1 (from wikipedia)
-	always @(posedge clk) begin
-		if (!reset) begin
-			out <= seed;
-			bit <= 6'd0;
-		end
-		else begin
-			bit <= (out >> 0) ^ (out >> 1);
-			out <= (out >> 1) | (bit << 3);
-			if(out == 6'd0) begin //0 will lock the LFSR
-				out <= seed;
-			end
-		end
-	end
+    input clk, reset;
+    input[5:0] seed;
+    output reg[5:0] out;
+    reg[5:0] newbit;
+    reg[31:0] counter;
+    
+    //Feedback polynomial: x^6 + x^5 + 1 (from wikipedia)
+    always @(posedge clk) begin
+        if (!reset) begin
+            out <= seed;
+            newbit <= 6'd0;
+            counter <= 1;
+        end
+        else begin
+            newbit <= ((out >> 0) ^ (out >> 1));
+            out <= (out >> 1) | (newbit << 5);
+            if(out == 6'd0) begin //0 will lock the LFSR
+                // out <= seed + counter;
+                out <= seed;
+                // counter <= counter + seed;
+            end
+        end
+    end
 endmodule
 
 //the randomness comes from when it's polled
-module pseudoRandomCounter(clk, reset, letterCode); 
-	input clk, reset;
-	output reg[5:0] letterCode;
-	always @(posedge clk) begin
-		if (!reset) begin
-			letterCode <= 6'd1;
-		end
-		else if (letterCode + 1'b1 < 6'd37) letterCode <= letterCode + 1'b1;
-		else letterCode <= 6'd1;
-	end
+module pseudoRandomCounter(clk, reset, letterCode);
+    input clk, reset;
+    output reg[5:0] letterCode;
+    always @(posedge clk) begin
+        if (!reset) begin
+            letterCode <= 6'd1;
+        end
+        else if (letterCode + 1'b1 < 6'd37) letterCode <= letterCode + 1'b1;
+        else letterCode <= 6'd1;
+    end
 endmodule
 
 module generateRandomLetter(clk, reset, seed, letterCode, valid);
-	input clk, reset;
-	input [5:0] seed;
-	output[5:0] letterCode;
-	output valid;
-	// LFSR lfsr0(clk, reset, seed, letterCode);
-	pseudoRandomCounter prc1(clk, reset, letterCode);
-	assign valid = (letterCode < 6'd37 & letterCode > 6'd0);
+    input clk, reset;
+    input [5:0] seed;
+    output[5:0] letterCode;
+    output valid;
+    LFSR lfsr0(clk, reset, seed, letterCode);
+    // pseudoRandomCounter prc1(clockk, reset, letterCode);
+    assign valid = (letterCode < 6'd37 & letterCode > 6'd0);
 endmodule
 
 module encodingToScanLUT(letterCode, scanCode);
-	input[5:0] letterCode;
-	output reg [7:0] scanCode;
-	always @(*) begin
-		case(letterCode)
-			6'd1: scanCode <= 8'h45; //0
-			6'd2: scanCode <= 8'h16; //1
-			6'd3: scanCode <= 8'h1E; //2
-			6'd4: scanCode <= 8'h26; //3
-			6'd5: scanCode <= 8'h25; //4
-			6'd6: scanCode <= 8'h2E; //5
-			6'd7: scanCode <= 8'h36; //6
-			6'd8: scanCode <= 8'h3D; //7
-			6'd9: scanCode <= 8'h3E; //8
-			6'd10: scanCode <= 8'h46; //9
-			6'd11: scanCode <= 8'h1C; //a
-			6'd12: scanCode <= 8'h32; //b
-			6'd13: scanCode <= 8'h21; //c
-			6'd14: scanCode <= 8'h23; //d
-			6'd15: scanCode <= 8'h24; //e
-			6'd16: scanCode <= 8'h2B; //f
-			6'd17: scanCode <= 8'h34; //g
-			6'd18: scanCode <= 8'h33; //h
-			6'd19: scanCode <= 8'h43; //i
-			6'd20: scanCode <= 8'h3B; //j
-			6'd21: scanCode <= 8'h42; //k
-			6'd22: scanCode <= 8'h4B; //l
-			6'd23: scanCode <= 8'h3A; //m
-			6'd24: scanCode <= 8'h31; //n
-			6'd25: scanCode <= 8'h44; //o
-			6'd26: scanCode <= 8'h4D; //p
-			6'd27: scanCode <= 8'h15; //q
-			6'd28: scanCode <= 8'h2D; //r
-			6'd29: scanCode <= 8'h1B; //s
-			6'd30: scanCode <= 8'h2C; //t
-			6'd31: scanCode <= 8'h3C; //u
-			6'd32: scanCode <= 8'h2A; //v
-			6'd33: scanCode <= 8'h1D; //w
-			6'd34: scanCode <= 8'h22; //x
-			6'd35: scanCode <= 8'h35; //y
-			6'd36: scanCode <= 8'h1A; //z
-			default: scanCode <= 8'd0;
-		endcase
-	end	
+    input[5:0] letterCode;
+    output reg [7:0] scanCode;
+    always @(*) begin
+        case(letterCode)
+            6'd1: scanCode <= 8'h45; //0
+            6'd2: scanCode <= 8'h16; //1
+            6'd3: scanCode <= 8'h1E; //2
+            6'd4: scanCode <= 8'h26; //3
+            6'd5: scanCode <= 8'h25; //4
+            6'd6: scanCode <= 8'h2E; //5
+            6'd7: scanCode <= 8'h36; //6
+            6'd8: scanCode <= 8'h3D; //7
+            6'd9: scanCode <= 8'h3E; //8
+            6'd10: scanCode <= 8'h46; //9
+            6'd11: scanCode <= 8'h1C; //a
+            6'd12: scanCode <= 8'h32; //b
+            6'd13: scanCode <= 8'h21; //c
+            6'd14: scanCode <= 8'h23; //d
+            6'd15: scanCode <= 8'h24; //e
+            6'd16: scanCode <= 8'h2B; //f
+            6'd17: scanCode <= 8'h34; //g
+            6'd18: scanCode <= 8'h33; //h
+            6'd19: scanCode <= 8'h43; //i
+            6'd20: scanCode <= 8'h3B; //j
+            6'd21: scanCode <= 8'h42; //k
+            6'd22: scanCode <= 8'h4B; //l
+            6'd23: scanCode <= 8'h3A; //m
+            6'd24: scanCode <= 8'h31; //n
+            6'd25: scanCode <= 8'h44; //o
+            6'd26: scanCode <= 8'h4D; //p
+            6'd27: scanCode <= 8'h15; //q
+            6'd28: scanCode <= 8'h2D; //r
+            6'd29: scanCode <= 8'h1B; //s
+            6'd30: scanCode <= 8'h2C; //t
+            6'd31: scanCode <= 8'h3C; //u
+            6'd32: scanCode <= 8'h2A; //v
+            6'd33: scanCode <= 8'h1D; //w
+            6'd34: scanCode <= 8'h22; //x
+            6'd35: scanCode <= 8'h35; //y
+            6'd36: scanCode <= 8'h1A; //z
+            default: scanCode <= 8'd0;
+        endcase
+    end 
 endmodule
 
 module scanToMorseLUT(scanCode, morseEncoding);
-	input[7:0] scanCode;
-	output reg [9:0] morseEncoding;
-	always @(*) begin
-		case(scanCode)
-			8'h45:	morseEncoding <= 10'b1111111111; //0
-			8'h16:	morseEncoding <= 10'b1011111111; //1
-			8'h1E:	morseEncoding <= 10'b1010111111; //2
-			8'h26:	morseEncoding <= 10'b1010101111; //3
-			8'h25:	morseEncoding <= 10'b1010101011; //4
-			8'h2E:	morseEncoding <= 10'b1010101010; //5
-			8'h36:	morseEncoding <= 10'b1111010100; //6
-			8'h3D:	morseEncoding <= 10'b1111110100; //7
-			8'h3E:	morseEncoding <= 10'b1111111100; //8
-			8'h46:	morseEncoding <= 10'b1111111110; //9
-			8'h1C:	morseEncoding <= 10'b1011000000; //a
-			8'h32:	morseEncoding <= 10'b1110101000; //b
-			8'h21:	morseEncoding <= 10'b1110111000; //c
-			8'h23:	morseEncoding <= 10'b1110100000; //d
-			8'h24:	morseEncoding <= 10'b1000000000; //e
-			8'h2B:	morseEncoding <= 10'b1010111000; //f
-			8'h34:	morseEncoding <= 10'b1111100000; //g
-			8'h33:	morseEncoding <= 10'b1010101000; //h
-			8'h43:	morseEncoding <= 10'b1010000000; //i
-			8'h3B:	morseEncoding <= 10'b1011111100; //j
-			8'h42:	morseEncoding <= 10'b1110110000; //k
-			8'h4B:	morseEncoding <= 10'b1011101000; //l
-			8'h3A:	morseEncoding <= 10'b1111000000; //m
-			8'h31:	morseEncoding <= 10'b1110000000; //n
-			8'h44:	morseEncoding <= 10'b1111110000; //o
-			8'h4D:	morseEncoding <= 10'b1011111000; //p
-			8'h15:	morseEncoding <= 10'b1111101100; //q
-			8'h2D:	morseEncoding <= 10'b1011100000; //r
-			8'h1B:	morseEncoding <= 10'b1010100000; //s
-			8'h2C:	morseEncoding <= 10'b1100000000; //t
-			8'h3C:	morseEncoding <= 10'b1010110000; //u
-			8'h2A:	morseEncoding <= 10'b1010101100; //v
-			8'h1D:	morseEncoding <= 10'b1011110000; //w
-			8'h22:	morseEncoding <= 10'b1110101100; //x
-			8'h35:	morseEncoding <= 10'b1110111100; //y
-			8'h1A:	morseEncoding <= 10'b1111101000; //z
+    input[7:0] scanCode;
+    output reg [9:0] morseEncoding;
+    always @(*) begin
+        case(scanCode)
+            8'h45:  morseEncoding <= 10'b1111111111; //0
+            8'h16:  morseEncoding <= 10'b1011111111; //1
+            8'h1E:  morseEncoding <= 10'b1010111111; //2
+            8'h26:  morseEncoding <= 10'b1010101111; //3
+            8'h25:  morseEncoding <= 10'b1010101011; //4
+            8'h2E:  morseEncoding <= 10'b1010101010; //5
+            8'h36:  morseEncoding <= 10'b1111010100; //6
+            8'h3D:  morseEncoding <= 10'b1111101010; //7
+            8'h3E:  morseEncoding <= 10'b1111111100; //8
+            8'h46:  morseEncoding <= 10'b1111111110; //9
+            8'h1C:  morseEncoding <= 10'b1011000000; //a
+            8'h32:  morseEncoding <= 10'b1110101000; //b
+            8'h21:  morseEncoding <= 10'b1110111000; //c
+            8'h23:  morseEncoding <= 10'b1110100000; //d
+            8'h24:  morseEncoding <= 10'b1000000000; //e
+            8'h2B:  morseEncoding <= 10'b1010111000; //f
+            8'h34:  morseEncoding <= 10'b1111100000; //g
+            8'h33:  morseEncoding <= 10'b1010101000; //h
+            8'h43:  morseEncoding <= 10'b1010000000; //i
+            8'h3B:  morseEncoding <= 10'b1011111100; //j
+            8'h42:  morseEncoding <= 10'b1110110000; //k
+            8'h4B:  morseEncoding <= 10'b1011101000; //l
+            8'h3A:  morseEncoding <= 10'b1111000000; //m
+            8'h31:  morseEncoding <= 10'b1110000000; //n
+            8'h44:  morseEncoding <= 10'b1111110000; //o
+            8'h4D:  morseEncoding <= 10'b1011111000; //p
+            8'h15:  morseEncoding <= 10'b1111101100; //q
+            8'h2D:  morseEncoding <= 10'b1011100000; //r
+            8'h1B:  morseEncoding <= 10'b1010100000; //s
+            8'h2C:  morseEncoding <= 10'b1100000000; //t
+            8'h3C:  morseEncoding <= 10'b1010110000; //u
+            8'h2A:  morseEncoding <= 10'b1010101100; //v
+            8'h1D:  morseEncoding <= 10'b1011110000; //w
+            8'h22:  morseEncoding <= 10'b1110101100; //x
+            8'h35:  morseEncoding <= 10'b1110111100; //y
+            8'h1A:  morseEncoding <= 10'b1111101000; //z
 
-			default: morseEncoding <= 15'd0;
+            default: morseEncoding <= 10'd0;
+        endcase
+    end
+endmodule
+
+module displayLetter(clk, reset, pixelPattern, topLeftX, x, y, colour, done);
+	input clk, reset;
+	input [14:0] pixelPattern;
+	input [7:0] topLeftX;
+	output reg [7:0] x;
+	output reg [6:0] y;
+	output reg [2:0] colour;
+	output done;
+	reg[3:0] counter;
+
+	always @(posedge clk) begin
+		if(~reset) begin
+			 counter <= 4'd0;
+			 x <= topLeftX;
+			 y <= 8'd5;
+		end 
+		else begin
+			if(pixelPattern[counter] == 1'b0) begin 
+				colour <= 3'b000;
+			end
+			if(x-topLeftX + 1'd1 >= 3'd4) begin
+				x <= topLeftX;
+				y <= y+1'b1; 
+			end
+			else x <= x + 1'b1;
+			counter <= counter + 1'b1;
+		end
+	end
+	assign done = counter == 4'b111;
+endmodule
+
+module patternEncoding(letterCode, pixelPattern);
+	input [5:0] letterCode;
+	output reg [0:14] pixelPattern;
+	
+	always @(*) begin
+		case(letterCode)
+			6'd1: pixelPattern <= 15'b111_101_101_101_111; //0
+			6'd2: pixelPattern <= 15'b010_110_010_010_111; //1
+			6'd3: pixelPattern <= 15'b111_001_111_100_111; //2
+			6'd4: pixelPattern <= 15'b111_001_111_001_111; //3
+			6'd5: pixelPattern <= 15'b101_101_111_001_001; //4
+			6'd6: pixelPattern <= 15'b111_100_111_001_111; //5
+			6'd7: pixelPattern <= 15'b111_100_111_101_111; //6
+			6'd8: pixelPattern <= 15'b111_001_001_001_001; //7
+			6'd9: pixelPattern <= 15'b111_101_111_101_111; //8
+			6'd10: pixelPattern <= 15'b111_101_111_001_001; //9
+			6'd11: pixelPattern <= 15'b010_101_111_101_101; //A
+			6'd12: pixelPattern <= 15'b110_101_110_101_110; //B
+			6'd13: pixelPattern <= 15'b010_101_100_101_010; //C
+			6'd14: pixelPattern <= 15'b110_101_101_101_110; //D
+			6'd15: pixelPattern <= 15'b111_100_111_100_111; //E
+			6'd16: pixelPattern <= 15'b111_100_111_100_100; //F
+			6'd17: pixelPattern <= 15'b011_100_100_101_011; //G
+			6'd18: pixelPattern <= 15'b101_101_111_101_101; //H
+			6'd19: pixelPattern <= 15'b010_010_010_010_010; //I
+			6'd20: pixelPattern <= 15'b001_001_001_101_010; //J
+			6'd21: pixelPattern <= 15'b101_101_110_101_101; //K
+			6'd22: pixelPattern <= 15'b100_100_100_100_111; //L
+			6'd23: pixelPattern <= 15'b101_111_101_101_101; //M
+			6'd24: pixelPattern <= 15'b110_101_101_101_101; //N
+			6'd25: pixelPattern <= 15'b010_101_101_101_010; //O
+			6'd26: pixelPattern <= 15'b110_101_110_100_100; //P
+			6'd27: pixelPattern <= 15'b010_101_101_111_011; //Q
+			6'd28: pixelPattern <= 15'b110_101_110_101_101; //R
+			6'd29: pixelPattern <= 15'b011_100_010_001_110; //S
+			6'd30: pixelPattern <= 15'b111_010_010_010_010; //T
+			6'd31: pixelPattern <= 15'b101_101_101_101_111; //U
+			6'd32: pixelPattern <= 15'b101_101_101_101_010; //V
+			6'd33: pixelPattern <= 15'b101_101_101_111_101; //W
+			6'd34: pixelPattern <= 15'b101_101_010_101_101; //X
+			6'd35: pixelPattern <= 15'b101_101_111_010_010; //Y
+			6'd36: pixelPattern <= 15'b111_001_010_100_111; //Z
+			default: pixelPattern <= 15'b000_000_000_000_000; //blank display
 		endcase
 	end
 endmodule
 
+
 module MorseInput(clk,reset, keyIn, dot, dash);
-	input clk, reset, keyIn;
+    input clk, reset, keyIn;
 
-	output reg dot, dash;
-	localparam S_WAIT = 2'd0,
-			   S_KEYDOWN = 2'd1,
-			   S_KEYUP = 2'd2,
-			   S_RESET = 2'd3;
+    output reg dot, dash;
+    localparam S_WAIT = 2'd0,
+            S_KEYDOWN = 2'd1,
+            S_KEYUP = 2'd2,
+            S_RESET = 2'd3;
 
+    reg[1:0] current_state, next_state;
 
-	reg[1:0] current_state, next_state;
+    always @(*)
+        begin
+            case(current_state)
+                S_WAIT : next_state = keyIn ? S_WAIT : S_KEYDOWN;
+                S_KEYDOWN : next_state = keyIn ? S_KEYUP: S_KEYDOWN;
+                S_KEYUP :next_state = S_RESET;
+                S_RESET : next_state = S_WAIT;
+                default : next_state = S_WAIT;
+            endcase // current_state
+        end
 
-	always @(*)
-		begin
-			case(current_state)
-				S_WAIT : next_state = keyIn ? S_WAIT : S_KEYDOWN;
-				S_KEYDOWN : next_state = keyIn ? S_KEYUP: S_KEYDOWN;
-				S_KEYUP :next_state = S_RESET;
-				S_RESET : next_state = S_WAIT;
-				default : next_state = S_WAIT;
-			endcase // current_state
-		end
-
-
-	wire enableDash;
-	reg resetInputCounter;
-	inputCounter iC0(clk, resetInputCounter, enableDash);
-	always @(*)
-		begin
-			dot  <= 1'b0;
-			dash <= 1'b0;
-			resetInputCounter <= 1'b0;
-			case(current_state)
-				S_KEYDOWN : resetInputCounter <= 1'b1;
-				S_KEYUP :
-					begin
-						// $display("%b", enableDash);
-						if(enableDash) dash <= 1'b1;
-						else dot <= 1'b1;
-					end
-			endcase
-		end
+    wire enableDash;
+    reg resetInputCounter;
+    inputCounter iC0(clk, resetInputCounter, enableDash);
+    always @(*)
+        begin
+            dot  <= 1'b0;
+            dash <= 1'b0;
+            resetInputCounter <= 1'b0;
+            case(current_state)
+                S_KEYDOWN : resetInputCounter <= 1'b1;
+                S_KEYUP :
+                    begin
+                        // $display("%b", enableDash);
+                        if(enableDash) dash <= 1'b1;
+                        else dot <= 1'b1;
+                    end
+                default: dot <= 1'b0;
+            endcase
+        end
 
     always @(posedge clk)
     begin
-    	// $display("%2b",next_state);
-    	if(!reset) current_state = S_WAIT;
-    	else current_state = next_state;
+        if(!reset) current_state = S_WAIT;
+        else current_state = next_state;
     end
 endmodule
 
 module inputCounter(clk, reset, enableDash);
-	input clk, reset;
-	output enableDash;
-	reg[25:0] q;
-	always @(posedge clk)
-	begin
-		if(!reset) q <= 0;
-		else begin
-			if(q + 1 == 0) begin //overflow
-				// q <= 25'b1011111010111100001000000;
-				q <= 25'd10;
-			end
-			q <= q + 1;
+    input clk, reset;
+    output enableDash;
+    reg[27:0] q;
+    always @(posedge clk)
+    begin
+        if(!reset) q <= 0;
+        else begin
+            if(q + 1'b1 == 0) begin //overflow
+                // q <= 26'b10111110101111000010000000;
+                q <= 25'd10;
+            end
+            q <= q + 1'b1;
 
-		end
-	end
-	// assign enableDash = q >= 25'b1011111010111100001000000 ? 1 : 0;
-	assign enableDash = q >= 25'd10;
+        end
+    end
+    // assign enableDash = q >= 26'b10111110101111000010000000 ? 1'b1 : 1'b0;
+    assign enableDash = q >= 25'd10;
 endmodule
 
 //modified from sample code
 module keyboard_handler (
-	input  clk,
-	input  reset,
-	inout  PS2_CLK,
-	inout  PS2_DAT,
-	output keyPressed,
-	output reg [7:0] keyCode
+    input  clk,
+    input  reset,
+    inout  PS2_CLK,
+    inout  PS2_DAT,
+    output keyPressed,
+    output reg [7:0] keyCode
 );
 
-	// A flag indicating when the keyboard has sent a new byte.
-	wire byte_received;
-	// The most recent byte received from the keyboard.
-	wire [7:0] newest_byte;
+    // A flag indicating when the keyboard has sent a new byte.
+    wire byte_received;
+    // The most recent byte received from the keyboard.
+    wire [7:0] newest_byte;
 
-	localparam // States indicating the type of code the controller expects
-		// to receive next.
-		MAKE            = 2'b00,
-		BREAK           = 2'b01,
-		SECONDARY_MAKE  = 2'b10,
-		SECONDARY_BREAK = 2'b11;
+    localparam // States indicating the type of code the controller expects
+        // to receive next.
+        MAKE            = 2'b00,
+        BREAK           = 2'b01,
+        SECONDARY_MAKE  = 2'b10,
+        SECONDARY_BREAK = 2'b11;
 
-	reg [1:0] curr_state;
+    reg [1:0] curr_state;
 
-	reg key_press;
+    reg key_press;
 
-	reg key_lock;
+    reg key_lock;
 
-	// Output is equal to the key press wires in mode 0 (hold), and is similar in
-	// mode 1 (pulse) except the signal is lowered when the key's lock goes high.
-	// TODO: ADD TO HERE WHEN IMPLEMENTING NEW KEYS
-	assign keyPressed = key_press && ~key_lock;
+    // Output is equal to the key press wires in mode 0 (hold), and is similar in
+    // mode 1 (pulse) except the signal is lowered when the key's lock goes high.
+    // TODO: ADD TO HERE WHEN IMPLEMENTING NEW KEYS
+    assign keyPressed = key_press && ~key_lock;
 
-	PS2_Controller #(.INITIALIZE_MOUSE(0)) core_driver (
-		.CLOCK_50        (clk),
-		.reset           (~reset       ),
-		.PS2_CLK         (PS2_CLK      ),
-		.PS2_DAT         (PS2_DAT      ),
-		.received_data   (newest_byte  ),
-		.received_data_en(byte_received)
-	);
+    PS2_Controller #(.INITIALIZE_MOUSE(0)) core_driver (
+        .CLOCK_50       (clk),
+        .reset          (~reset     ),
+        .PS2_CLK        (PS2_CLK    ),
+        .PS2_DAT        (PS2_DAT    ),
+        .received_data   (newest_byte  ),
+        .received_data_en(byte_received)
+    );
 
-	always @(posedge clk) begin
-		curr_state <= MAKE;
-		key_lock <= key_press;
-		if (~reset) begin
-			curr_state <= MAKE;
-			key_press <= 1'b0;
-			key_lock <= 1'b0;
-		end
-		else if (byte_received) begin
-			case (newest_byte)
-				8'he0 : curr_state <= SECONDARY_MAKE;
-				8'hf0 : curr_state <= curr_state == MAKE ? BREAK : SECONDARY_BREAK;
-				default: begin
-					key_press <= curr_state == MAKE;
-					keyCode <= newest_byte;
-				end 
-			endcase
-		end
-		else begin
-			curr_state <= curr_state;
-		end
-	end
-	assign keyPressed = key_press;
+    always @(posedge clk) begin
+        curr_state <= MAKE;
+        key_lock <= key_press;
+        if (~reset) begin
+            curr_state <= MAKE;
+            key_press <= 1'b0;
+            key_lock <= 1'b0;
+        end
+        else if (byte_received) begin
+            case (newest_byte)
+                8'he0 : curr_state <= SECONDARY_MAKE;
+                8'hf0 : curr_state <= curr_state == MAKE ? BREAK : SECONDARY_BREAK;
+                default: begin
+                    key_press <= curr_state == MAKE;
+                    keyCode <= newest_byte;
+                end
+            endcase
+        end
+        else begin
+            curr_state <= curr_state;
+        end
+    end
+    assign keyPressed = key_press;
+endmodule
+
+module hex_decoder(hex_digit, segments);
+    input [3:0] hex_digit;
+    output reg [6:0] segments;
+ 
+    always @(*)
+        case (hex_digit)
+            4'h0: segments = 7'b100_0000;
+            4'h1: segments = 7'b111_1001;
+            4'h2: segments = 7'b010_0100;
+            4'h3: segments = 7'b011_0000;
+            4'h4: segments = 7'b001_1001;
+            4'h5: segments = 7'b001_0010;
+            4'h6: segments = 7'b000_0010;
+            4'h7: segments = 7'b111_1000;
+            4'h8: segments = 7'b000_0000;
+            4'h9: segments = 7'b001_1000;
+            4'hA: segments = 7'b000_1000;
+            4'hB: segments = 7'b000_0011;
+            4'hC: segments = 7'b100_0110;
+            4'hD: segments = 7'b010_0001;
+            4'hE: segments = 7'b000_0110;
+            4'hF: segments = 7'b000_1110; 
+            default: segments = 7'h7f;
+        endcase
 endmodule

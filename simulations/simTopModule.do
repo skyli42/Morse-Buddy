@@ -13,83 +13,69 @@ force {CLOCK_50} 1 0ns, 0 5ns -repeat 10ns
 
 # reset
 force {KEY} 2#1110
-force {SW} 2#1101100101
-run 10ns
-
-force {KEY} 2#1111
+force {SW} 2#0001101101
 run 10ns
 
 force {KEY} 2#0111
 run 10ns
 
 force {KEY} 2#1111
-run 40ns
+run 200ns
+
+# letter 1
+force {KEY} 2#1101
+run 50ns
+
+force {KEY} 2#1111
+run 50ns
 
 force {KEY} 2#1101
-run 20ns
+run 100ns
+
 force {KEY} 2#1111
-run 20ns
+run 50ns
+
 force {KEY} 2#1101
-run 20ns
+run 50ns
+
 force {KEY} 2#1111
-run 20ns
+run 50ns
+
 force {KEY} 2#1101
-run 20ns
+run 50ns
+
 force {KEY} 2#1111
-run 20ns
-force {KEY} 2#1101
-run 20ns
-force {KEY} 2#1111
-run 20ns
-force {KEY} 2#1101
-run 120ns
-force {KEY} 2#1111
-run 20ns
+run 50ns
+
 force {KEY} 2#0111
-run 10ns
+run 20ns
+
 force {KEY} 2#1111
 run 100ns
 
+# letter 2
+force {KEY} 2#1101
+run 50ns
+
+force {KEY} 2#1111
+run 50ns
+
+force {KEY} 2#1101
+run 50ns
+
+force {KEY} 2#1111
+run 50ns
+
+force {KEY} 2#1101
+run 50ns
+
+force {KEY} 2#1111
+run 50ns
+
 force {KEY} 2#0111
-run 10ns
-force {KEY} 2#1111
 run 20ns
 
-#new iteration
-
-
-force {KEY} 2#0111
-run 10ns
-
-force {KEY} 2#1111
-run 40ns
-
-force {KEY} 2#1101
-run 20ns
-force {KEY} 2#1111
-run 20ns
-force {KEY} 2#1101
-run 20ns
-force {KEY} 2#1111
-run 20ns
-force {KEY} 2#1101
-run 20ns
-force {KEY} 2#1111
-run 20ns
-force {KEY} 2#1101
-run 20ns
-force {KEY} 2#1111
-run 20ns
-force {KEY} 2#1101
-run 120ns
-force {KEY} 2#1111
-run 20ns
-force {KEY} 2#0111
-run 10ns
 force {KEY} 2#1111
 run 100ns
 
-force {KEY} 2#0111
-run 10ns
-force {KEY} 2#1111
-run 20ns
+
