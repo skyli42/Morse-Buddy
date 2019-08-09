@@ -20,62 +20,61 @@ force {KEY} 2#0111
 run 10ns
 
 force {KEY} 2#1111
-run 200ns
+run 1200ns
+
 
 # letter 1
 force {KEY} 2#1101
 run 50ns
 
 force {KEY} 2#1111
-run 50ns
+run 500ns
 
 force {KEY} 2#1101
-run 100ns
+run 200ns
 
 force {KEY} 2#1111
-run 50ns
-
-force {KEY} 2#1101
-run 50ns
-
-force {KEY} 2#1111
-run 50ns
+run 500ns
 
 force {KEY} 2#1101
 run 50ns
 
 force {KEY} 2#1111
+run 500ns
+
+force {KEY} 2#1101
 run 50ns
+
+force {KEY} 2#1111
+run 500ns
 
 force {KEY} 2#0111
 run 20ns
 
 force {KEY} 2#1111
-run 100ns
+run 1200ns
 
-# letter 2
+#letter 2
 force {KEY} 2#1101
-run 50ns
-
+run 10ns
 force {KEY} 2#1111
-run 50ns
-
+run 500ns
 force {KEY} 2#1101
-run 50ns
-
+run 150ns
 force {KEY} 2#1111
-run 50ns
-
+run 500ns
 force {KEY} 2#1101
-run 50ns
-
+run 150ns
 force {KEY} 2#1111
-run 50ns
-
+run 500ns
+force {KEY} 2#1101
+run 10ns
+force {KEY} 2#1111
+run 500ns
 force {KEY} 2#0111
 run 20ns
 
 force {KEY} 2#1111
-run 100ns
+run 1200ns
 
 

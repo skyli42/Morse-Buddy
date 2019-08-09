@@ -12,8 +12,11 @@ force {clk} 1 0ns, 0 5ns -repeat 10ns
 
 
 force {reset} 0
-force {morseCode} 2#1110101111 # - . . - -
+force {topLeftX} 10#10
+force {topLeftY} 10#10
+force {inColour} 2#111 
+force {morseCode} 2#1110101111	
 run 10ns
 force {reset} 1
 force {morseCode} 2#0000000000
-run 200ns
+run 100ns

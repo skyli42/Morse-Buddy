@@ -23,4 +23,14 @@ run 10ns
 
 force {reset} 1
 force {generateLetters} 1
-run 200ns
+run 150ns
+
+force {displayLetters} 1
+force {generateLetters} 0
+run 150ns
+
+force {resetDrawIndividual} 0
+run 10ns
+
+force {resetDrawIndividual} 1
+run 150ns

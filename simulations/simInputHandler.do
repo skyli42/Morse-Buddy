@@ -17,30 +17,30 @@ run 10ns
 
 force {reset} 1
 force {keyIn} 0
+run 100ns
+
+force {keyIn} 1
 run 150ns
 
-force {keyIn} 1
-run 30ns
-
 force {keyIn} 0
 run 20ns
 
 force {keyIn} 1
-run 40ns
+run 150ns
 
 force {keyIn} 0
 run 20ns
 force {keyIn} 1
-run 20ns
+run 150ns
 force {keyIn} 0
 run 20ns
 force {keyIn} 1
-run 20ns
+run 150ns
 
 force {keyIn} 0
 run 110ns
 force {keyIn} 1
-run 30ns
+run 150ns
 
 
 force {keyIn} 0
