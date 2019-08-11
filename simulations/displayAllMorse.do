@@ -19,11 +19,10 @@ run 10ns
 
 force {reset} 1
 force {resetIndividual} 1
-run 160ns
+run 100ns
 
 force {resetIndividual} 0
-force {lettersDone} 2#0001
 run 10ns
 
 force {resetIndividual} 1
-run 200ns
+run 100ns

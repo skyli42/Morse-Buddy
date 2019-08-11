@@ -20,3 +20,8 @@ run 10ns
 force {reset} 1
 force {morseCode} 2#0000000000
 run 100ns
+force {reset} 0
+force {morseCode} 2#1010111010
+run 10ns
+force {reset} 1
+run 100ns
