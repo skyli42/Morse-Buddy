@@ -909,7 +909,6 @@ module displayAllMorse(clk, reset, resetIndividual, morseCodes, lettersDone, top
 	output [2:0] colour;
 	output doneIndividual;
 	output reg doneAll;
-	wire[14:0] curPattern;
 	reg[numLetterBits-1:0] curMorseCodes;
 
 	wire[9:0] curMorse;
@@ -922,7 +921,6 @@ module displayAllMorse(clk, reset, resetIndividual, morseCodes, lettersDone, top
 	always @(*) begin
 		inColour <= (numLetters - counter -1'b1== lettersDone) ? 3'b100: 3'b111;
 	end
-	reg done_lock;
 	always @(posedge clk) begin
 		if(~reset) begin
 			counter <= numLetters-1'b1;

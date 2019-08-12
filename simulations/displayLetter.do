@@ -12,7 +12,6 @@ force {clk} 1 0ns, 0 5ns -repeat 10ns
 
 
 force {reset} 0
-force {resetAll} 0
 force {pixelPattern} 2#010101101111011
 force {topLeftX} 2#00001000
 force {topLeftY} 10#5
@@ -20,7 +19,6 @@ force {inColour} 2#111
 run 10ns
 
 force {reset} 1
-force {resetAll} 1
 run 160ns
 
 force {reset} 0

@@ -14,6 +14,7 @@ force {clk} 1 0ns, 0 5ns -repeat 10ns
 force {reset} 0
 force {resetIndividual} 0
 force {morseCodes} 2#10101100001111111111111000000010000000001011111000
+force {topY} 2#001001
 force {lettersDone} 0
 run 10ns
 

@@ -13,6 +13,7 @@ force {clk} 1 0ns, 0 5ns -repeat 10ns
 force {reset} 0
 force {keyIn} 1
 force {enable} 1
+force {topY} 2#110000
 run 10ns
 
 force {reset} 1

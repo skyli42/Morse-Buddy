@@ -16,6 +16,7 @@ force {morseCodes} 2#11101010111000000000
 force {keyIn} 1
 force {enableInput} 1
 force {verify} 0
+force {topY} 2#111110
 force {resetInput} 1
 run 10ns
 

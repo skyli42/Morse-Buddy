@@ -12,6 +12,7 @@ force {clk} 1 0ns, 0 5ns -repeat 10ns
 
 force {reset} 0
 force {keyIn} 1
+force {drawDone} 0
 run 10ns
 
 force {reset} 1
@@ -19,9 +20,11 @@ force {keyIn} 0
 run 150ns
 
 force {keyIn} 1
-run 30ns
-
+run 10ns
+force {drawDone} 1
+run 20ns
 force {keyIn} 0
+force {drawDone} 0
 run 20ns
 
 force {keyIn} 1

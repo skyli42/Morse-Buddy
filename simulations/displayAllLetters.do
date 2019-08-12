@@ -15,6 +15,7 @@ force {reset} 0
 force {resetIndividual} 0
 force {letterCodes} 2#011011011011011011011011011011
 force {lettersDone} 2#0
+force {topY} 2#001100
 run 10ns
 
 force {reset} 1
