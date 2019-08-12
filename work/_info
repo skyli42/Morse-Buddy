@@ -7,4 +7,67 @@ z2
 !i10e 25
 !i10f 100
 cModel Technology
-dC:/Users/skyli/Documents/GitHub/Morse-Buddy
+Z0 dC:/Users/skyli/Documents/GitHub/Morse-Buddy
+vcounter
+Z1 !s110 1565547734
+!i10b 1
+!s100 ke2C17cIc80jo8b5]Cai<0
+I=m4ClEKBg<gLH`^>AgY600
+Z2 VDg1SIo80bB@j0V0VzS_@n1
+R0
+Z3 w1565547655
+Z4 8test.v
+Z5 Ftest.v
+L0 14
+Z6 OV;L;10.5b;63
+r1
+!s85 0
+31
+Z7 !s108 1565547734.000000
+Z8 !s107 test.v|
+Z9 !s90 -reportprogress|300|-timescale|1ns/1ns|test.v|
+!i113 1
+Z10 o-timescale 1ns/1ns
+Z11 tCvgOpt 0
+vtest
+R1
+!i10b 1
+!s100 D=QLGd88d]FB97SL9DDKS2
+I0U9C^Il<Z@caM8P`4mVeR0
+R2
+R0
+R3
+R4
+R5
+L0 1
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
+vwrapper
+R1
+!i10b 1
+!s100 fjQQ[58HC]6SCO:WClWG?3
+IHATz^gLZAeM>^QS0YGPZ;0
+R2
+R0
+R3
+R4
+R5
+L0 7
+R6
+r1
+!s85 0
+31
+R7
+R8
+R9
+!i113 1
+R10
+R11
