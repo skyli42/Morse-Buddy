@@ -1,7 +1,8 @@
 
 //TODO: Change the counter duration for Morse Input
 //Connect everything
-module MorseBuddy(CLOCK_50, KEY, SW, LEDR, HEX0, HEX1, HEX2, HEX3, VGA_CLK,                         //  VGA Clock
+module MorseBuddy(CLOCK_50, KEY, SW, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5,
+									VGA_CLK,                         //  VGA Clock
 									VGA_HS,                         //  VGA H_SYNC
 									VGA_VS,                         //  VGA V_SYNC
 									VGA_BLANK_N,                    //  VGA BLANK
@@ -11,7 +12,7 @@ module MorseBuddy(CLOCK_50, KEY, SW, LEDR, HEX0, HEX1, HEX2, HEX3, VGA_CLK,     
 									VGA_B,                          //  VGA Blue[9:0]
 									PS2_CLK,
 									PS2_DAT
-								 );
+);
 	input CLOCK_50;
 	input [3:0] KEY;
 	input [9:0] SW;
@@ -20,11 +21,13 @@ module MorseBuddy(CLOCK_50, KEY, SW, LEDR, HEX0, HEX1, HEX2, HEX3, VGA_CLK,     
 	wire[5:0] seed;
 	assign seed = SW[5:0];
 	assign clk = CLOCK_50;
-	assign reset = KEY[0];
-	assign keyIn = KEY[1];
-	assign proceed = KEY[3];
+	assign reset = SW[8];
+	assign keyIn1 = KEY[0];
+	assign proceed1 = KEY[1];
+	assign proceed2 = KEY[2];
+	assign keyIn2 = KEY[3];
 	assign mode = SW[9]; // 0 = text --> morse, 1 = morse --> text
-	output[6:0] HEX0, HEX1, HEX2, HEX3;
+	output[6:0] HEX0, HEX1, HEX2, HEX3, HEX4, HEX5;
 	output      VGA_CLK;    //  VGA Clock
 	output      VGA_HS;     //  VGA H_SYNC
 	output      VGA_VS;     //  VGA V_SYNC
@@ -37,12 +40,17 @@ module MorseBuddy(CLOCK_50, KEY, SW, LEDR, HEX0, HEX1, HEX2, HEX3, VGA_CLK,     
 	wire[2:0] colour;
 	wire[7:0] x;
 	wire[6:0] y;
-	gameManager gameManager0(clk, reset, seed, k)
-	assign LEDR = curLetterCode;
-	hex_decoder hex0(morseIn[3:0], HEX0);
-	hex_decoder hex1(morseIn[7:4], HEX1);
-	hex_decoder hex2({2'b00,morseIn[9:8]}, HEX2);
-	hex_decoder hex3({3'b000,correct}, HEX3);
+	wire vgaEn, player1Win, player2Win;
+	wire[9:0] morseIn1, curLetterCode1, morseIn2, curLetterCode2;
+	wire[1:0] correct;
+	gameManager gameManager0(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x, y, colour, vgaEn, morseIn1, curLetterCode1, morseIn2, curLetterCode2, correct, player1Win, player2Win);
+	assign LEDR= {player1Win, player2Win, 6'd0, correct};
+	hex_decoder hex0(morseIn1[3:0], HEX0);
+	hex_decoder hex1(morseIn1[7:4], HEX1);
+	hex_decoder hex2({2'b00,morseIn1[9:8]}, HEX2);
+	hex_decoder hex3(morseIn2[3:0], HEX3);
+	hex_decoder hex4(morseIn2[7:4], HEX4);
+	hex_decoder hex5({2'b00,morseIn2[9:8]}, HEX5);
 
 	//  vga_adapter VGA(
 	//         .resetn(reset),
@@ -66,16 +74,17 @@ module MorseBuddy(CLOCK_50, KEY, SW, LEDR, HEX0, HEX1, HEX2, HEX3, VGA_CLK,     
 	// defparam VGA.BACKGROUND_IMAGE = "black.mif";
 endmodule
 
-module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x, y, colour, vgaEn, morseIn1, curLetterCode1, morseIn2, curLetterCode2);
+module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x, y, colour, vgaEn, morseIn1, curLetterCode1, morseIn2, curLetterCode2, correct, player1Win, player2Win);
 	input clk, reset, keyIn1, keyIn2, proceed1, proceed2, mode;
 	input[5:0] seed;
-	output vgaEn;
+	output vgaEn, player1Win, player2Win;
 	output reg[7:0] x;
 	output reg[6:0] y;
 	output reg[2:0] colour;
 	output[9:0] morseIn1, curLetterCode1, morseIn2, curLetterCode2;
 	reg doneGeneratingLetters;
-	wire[1:0] keyIn, proceed, finishedAllVerification, correct, doneDrawIndividual, doneDrawAll;
+	wire[1:0] keyIn, proceed, finishedAllVerification, doneDrawIndividual, doneDrawAll;
+	output[1:0] correct;
 	assign proceed = {proceed2, proceed1};
 	assign keyIn = {keyIn2, keyIn1};
 	wire generateLetters, resetDatapath, wipeScreen;
@@ -85,6 +94,7 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 	reg[29:0] letterCodes;
 	reg[2:0] lettersToGenerate;
 	wire valid;
+	wire[5:0] letterCode;
 	wire [7:0] scanCode;
 	wire [9:0] morseCode;
 	generateRandomLetter genRandLetter0(clk, reset, seed, letterCode, valid);
@@ -97,21 +107,21 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 
 	wire[1:0] datapath_clk;
 	clock_offsetter clockOffset0(clk, reset, datapath_clk[0], datapath_clk[1]);
-
+	reg curMode;
 	datapath player1(
 		datapath_clk[0],
 		resetDatapath,
-		wipeScreen,
+		morseCodes,
+		letterCodes,
 		displayMatch[0],
 		resetDisplayIndividual[0],
 		enableInput[0],
 		resetInput[0],
 		resetMod[0],
 		keyIn[0],
-		proceed[0],
 		verify[0],
-		seed[0],
 		mode,
+		7'd10,
 
 		ps2Clk,
 		ps2Dat,
@@ -129,18 +139,18 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 		);
 	datapath player2(
 		datapath_clk[1],
-		resetDatapath,
-		wipeScreen,
+		resetDatapath & ~curMode,
+		morseCodes,
+		letterCodes,
 		displayMatch[1],
 		resetDisplayIndividual[1],
 		enableInput[1],
 		resetInput[1],
 		resetMod[1],
 		keyIn[1],
-		proceed[1],
 		verify[1],
-		seed[1],
 		mode,
+		7'd70,
 
 		ps2Clk,
 		ps2Dat,
@@ -156,9 +166,11 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 		doneDrawAll[1],
 		drawInputEn[1]
 		);
-	wire [3:0] current_state;
+	wire [2:0] current_state;
 	control control0(
 		clk,
+		datapath_clk[0],
+		datapath_clk[1],
 		reset, 
 		proceed, 
 		doneGeneratingLetters,
@@ -176,7 +188,9 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 		verify,
 		resetMod,
 		resetDisplayIndividual,
-		current_state
+		current_state,
+		player1Win,
+		player2Win
 	 ); 
 	always @(posedge clk) begin
 		if(~reset) begin
@@ -184,6 +198,7 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 			letterCodes           <= 30'd0;
 			lettersToGenerate     <= 3'd4;
 			doneGeneratingLetters <= 1'b0;
+			curMode <= mode;
 		end
 		else begin
 			if(generateLetters) begin
@@ -200,6 +215,11 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 			end
 		end
 	end
+	wire[7:0] wipeX;
+	wire[6:0] wipeY;
+	wire[2:0] wipeColour;
+	wipeScreen wS0(clk,wipeScreen&reset,wipeX,wipeY,wipeColour);
+
 	reg vgaDatapathEn;
 	always @(posedge clk) begin
 		if (~reset) begin
@@ -208,7 +228,7 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 			colour <= 3'b000;
 			vgaDatapathEn <= 1'b0;
 		end
-		else begin
+		else if(~wipeScreen) begin
 			if(datapath_clk[0]) begin
 				x <= x1;
 				y <= y1;
@@ -221,6 +241,11 @@ module gameManager(clk, reset, seed, keyIn1, keyIn2, proceed1, proceed2, mode, x
 				colour <= colour2;
 				vgaDatapathEn <= displayMatch[1] | drawInputEn[1];
 			end
+		end
+		else begin
+			x      <= wipeX;
+			y      <= wipeY;
+			colour <= wipeColour;
 		end
 	end
 	assign vgaEn = vgaDatapathEn | wipeScreen;
@@ -245,16 +270,17 @@ module clock_offsetter(clk, reset, clk1, clk2);
 endmodule
 
 module datapath(
-	clk,reset, wipeScreen, morseCodes, letterCodes, displayMatch, resetDrawIndividual, enableInput, resetInput, 
-	resetMod, keyIn, proceed, verify, seed, mode, ps2Clk, ps2Dat, 
+	clk,reset, morseCodes, letterCodes, displayMatch, resetDrawIndividual, enableInput, resetInput, 
+	resetMod, keyIn, verify, mode, topY,
+	 ps2Clk, ps2Dat, 
 	finishedAllVerification, correct, x, y, colour, morseIn,
 	curLetterCode, doneDrawIndividual, doneDrawAll, drawInputEn
 );
 	parameter numLetters = 5;
 	parameter numLetterBits = numLetters * 10;
 	parameter numLetterBits2 = numLetters * 6;
-	input clk, reset, displayMatch, resetDrawIndividual, enableInput, resetInput, resetMod, proceed, verify, keyIn, mode, wipeScreen;
-	input[5:0] seed;
+	input clk, reset, displayMatch, resetDrawIndividual, enableInput, resetInput, resetMod, verify, keyIn, mode;
+	input [6:0] topY;
 	input [49:0] morseCodes;
 	input [29:0] letterCodes;
 	inout ps2Dat, ps2Clk;
@@ -279,24 +305,19 @@ module datapath(
 	wire keyPressed, keyCorrect, keyFinishedAll, keyDoneInd, keyDoneAll, keyDrawEn;
 
 	morseMatch morMatch0(clk, reset & resetMod, morseCodes, keyIn, enableInput, resetInput, verify,
-											 morseCorrect, morseFinishedAll, morseIn, morseLettersDone, morseX, morseY, morseColour, morseDrawEn);
+											 morseCorrect, morseFinishedAll, morseIn, morseLettersDone, topY, morseX, morseY, morseColour, morseDrawEn);
 
-	displayAllLetters displayLetter0(clk, displayMatch, resetDrawIndividual, letterCodes, morseLettersDone, letterX, letterY, letterColour, morseDoneInd, morseDoneAll);
+	displayAllLetters displayLetter0(clk, displayMatch, resetDrawIndividual, letterCodes, morseLettersDone, topY, letterX, letterY, letterColour, morseDoneInd, morseDoneAll);
 
 	keyboardMatch keyMatch0 (
-		clk, reset & resetMod, morseCodes, verify, ps2Clk, ps2Dat,
+		clk, reset & resetMod, morseCodes, verify, topY, ps2Clk, ps2Dat,
 		keyPressed, keyCorrect, keyLettersDone, keyFinishedAll, keyLetterX, keyLetterY, keyLetterColour, keyDrawEn
 	);
-	displayAllMorse dispMorseAll0 (clk,displayMatch,resetDrawIndividual,morseCodes,keyLettersDone,keyMorseX,keyMorseY,keyMorseColour,keyDoneInd,keyDoneAll);
+	displayAllMorse dispMorseAll0 (clk,displayMatch,resetDrawIndividual,morseCodes,keyLettersDone,topY, keyMorseX,keyMorseY,keyMorseColour,keyDoneInd,keyDoneAll);
 	reg[numLetterBits-1:0] shiftedMorseCodes;
 	assign curLetterCode = shiftedMorseCodes[numLetterBits-1:numLetterBits-10];
 	wire done;
-
-
-	wire[7:0] wipeX;
-	wire[6:0] wipeY;
-	wire[2:0] wipeColour;
-	wipeScreen wS0(clk,wipeScreen,wipeX,wipeY,wipeColour);
+	
 	always @(posedge clk) begin
 		if (~reset) begin
 			curMode <= mode;
@@ -316,11 +337,6 @@ module datapath(
 			drawInputEn             <= 0;
 			doneDrawAll             <= 0;
 			doneDrawIndividual      <= 0;
-		end
-		if(wipeScreen) begin
-			x      <= wipeX;
-			y      <= wipeY;
-			colour <= wipeColour;
 		end
 		else begin
 			if(~curMode) begin
@@ -396,11 +412,12 @@ module wipeScreen(clk, reset, x, y, colour);
 	assign colour = 3'b000;
 endmodule
 
-module keyboardMatch(clk, reset, morseCodes, verify, PS2_CLK, PS2_DAT, keyPressed, correct, lettersDone, finishedAllVerification, x, y, colour, drawEn);
+module keyboardMatch(clk, reset, morseCodes, verify, topY, PS2_CLK, PS2_DAT, keyPressed, correct, lettersDone, finishedAllVerification, x, y, colour, drawEn);
 	parameter numLetters = 5;
 	parameter numLetterBits = numLetters * 10;
 	input clk, reset, verify;
 	input [numLetterBits-1:0] morseCodes;
+	input[6:0] topY;
 	reg [numLetterBits-1:0] curMorse;
 	inout PS2_CLK, PS2_DAT;
 	output correct, finishedAllVerification;
@@ -417,7 +434,7 @@ module keyboardMatch(clk, reset, morseCodes, verify, PS2_CLK, PS2_DAT, keyPresse
 	patternEncoding pattern0(letterCode, curPattern);
 	assign finishedAllVerification = curMorse == {numLetterBits{1'b0}};
 	wire done;
-	displayLetter displayLet1(clk, reset & drawEn & ~done, curPattern, 8'd20, 7'd60, 3'b111, x, y, colour, done);
+	displayLetter displayLet1(clk, reset & drawEn & ~done, curPattern, 8'd20, topY+7'd20, 3'b111, x, y, colour, done);
 	wire[9:0] morseIn;
 	scanToMorseLUT keyboardMatchLUT(keyCode, morseIn);
 	wire correct;
@@ -443,11 +460,12 @@ module keyboardMatch(clk, reset, morseCodes, verify, PS2_CLK, PS2_DAT, keyPresse
 
 endmodule
 
-module morseMatch(clk, reset, morseCodes, keyIn, enableInput, resetInput, verify,correct, finishedAllVerification, morseIn, lettersDone, x, y, colour, drawEn);
+module morseMatch(clk, reset, morseCodes, keyIn, enableInput, resetInput, verify,correct, finishedAllVerification, morseIn, lettersDone, topY, x, y, colour, drawEn);
 	parameter numLetters = 5;
 	parameter numLetterBits = numLetters * 10;
 	input clk, reset, keyIn, enableInput, resetInput, verify;
 	input [numLetterBits-1:0] morseCodes;
+	input[6:0] topY;
 	output correct, finishedAllVerification, drawEn;
 	output reg[3:0] lettersDone;
 	output [7:0] x;
@@ -455,8 +473,8 @@ module morseMatch(clk, reset, morseCodes, keyIn, enableInput, resetInput, verify
 	output [2:0] colour;
 	reg[numLetterBits-1:0] curMorse;
 	output[9:0] morseIn;
-	assign finishedAllVerification = (curMorse << 10) == {numLetterBits{1'b0}};
-	inputHandler morseIn0(clk, resetInput & reset, keyIn, enableInput, morseIn, x, y, colour, drawEn);
+	assign finishedAllVerification = curMorse == {numLetterBits{1'b0}};
+	inputHandler morseIn0(clk, resetInput & reset, keyIn, enableInput, topY, morseIn, x, y, colour, drawEn);
 	assign correct = curMorse[numLetterBits-1:numLetterBits-10] == morseIn;
 	always @(posedge clk) begin
 		if (~reset) begin
@@ -470,18 +488,23 @@ module morseMatch(clk, reset, morseCodes, keyIn, enableInput, resetInput, verify
 			curMorse <= curMorse << 10;
 			lettersDone <= lettersDone + 1'b1;
 		end
+		else if(verify) begin
+			$display("Incorrect");
+			$display("%10b", morseIn);
+			$display("%10b", curMorse[numLetterBits-1:numLetterBits-10]);
+		end
 	end
 endmodule
 
 module control(
-	clk, reset, proceed, doneGeneratingLetters, finishedAllVerification,
+	clk, clk1, clk2, reset, proceed, doneGeneratingLetters, finishedAllVerification,
 	correct, doneDrawIndividual, doneDrawAll,
 	generateLetters, wipeScreen,  resetDatapath,enableInput, displayMatch, resetInput, verify,
-	resetMod, resetDisplayIndividual, current_state
+	resetMod, resetDisplayIndividual, current_state, player1Win, player2Win
 );
-	input clk, reset, doneGeneratingLetters;
+	input clk, clk1, clk2, reset, doneGeneratingLetters;
 	input[1:0] proceed, finishedAllVerification, correct, doneDrawIndividual, doneDrawAll;
-	output reg generateLetters, wipeScreen, resetDatapath;
+	output reg generateLetters, wipeScreen, resetDatapath, player1Win, player2Win;
 	output reg[1:0] enableInput, displayMatch, resetInput, verify, resetMod,  resetDisplayIndividual;
 
 	localparam
@@ -586,7 +609,8 @@ module control(
 		resetDatapath <= 1'b1;
 		resetInput <= 2'b11;
 		resetMod <= 2'b11;
-
+		player1Win <= 1'b0;
+		player2Win <= 1'b0;
 		verify <= 2'd0;
 		resetDisplayIndividual <= 2'd0;
 		wipeScreen <= 1'b0;
@@ -600,7 +624,10 @@ module control(
 				resetDatapath <= 1'b0;
 				firstDone <= 2'd0;
 			end
-			GENERATE_LETTERS: generateLetters <= 1'b1;
+			GENERATE_LETTERS: begin
+				generateLetters <= 1'b1;
+				resetDatapath <= 1'b0;
+			end 
 			GAMEPLAY: begin
 				case(player1_state)
 					RESET_DISPLAY_INDIVIDUAL : displayMatch[0] <= 1'b1;
@@ -631,25 +658,27 @@ module control(
 					VERIFY: verify[1] <= 1'b1;
 				endcase
 			end
-			
+			PLAYER1_WIN: player1Win <= 1'b1;
+			PLAYER2_WIN: player2Win <= 1'b1;
 		endcase
 	end
 
 	always @(posedge clk) begin
-		if (!reset) begin
-			current_state <= START;
-			player1_state <= RESET_DISPLAY_MATCH;
-			player2_state <= RESET_DISPLAY_MATCH;
-		end
-		else begin
-			current_state <= next_state;
-			player1_state <= player1_next;
-			player2_state <= player2_next;
-		end
+		if (~reset) current_state <= START;
+		else current_state <= next_state;
+	end
+	always @(posedge clk1) begin
+		if(~reset) player1_state <= RESET_DISPLAY_MATCH;
+		else player1_state <= player1_next;
+	end
+	always @(posedge clk2) begin
+		if (~reset) player2_state <= RESET_DISPLAY_MATCH;
+		else player2_state <= player2_next;
 	end
 endmodule
-module inputHandler(clk, reset, keyIn, enable, curCode, x, y, colour, drawEn);
+module inputHandler(clk, reset, keyIn, enable, topY, curCode, x, y, colour, drawEn);
 	input clk, reset, keyIn, enable;
+	input[6:0] topY;
 	output reg[9:0] curCode; //5 2-bit seminibbles (10 = dot, 11 = dash)
 	output[7:0] x;
 	output[6:0] y;
@@ -661,7 +690,7 @@ module inputHandler(clk, reset, keyIn, enable, curCode, x, y, colour, drawEn);
 
 	MorseInput m0 (clk, reset, keyIn,drawDone, dot, dash, drawEn);
 
-	displayMorse displayMorse0(clk, reset & drawEn, curCode,8'd10, 7'd40, 3'b111, x, y, colour, drawDone);
+	displayMorse displayMorse0(clk, reset & drawEn, curCode,8'd10, topY + 7'd20, 3'b111, x, y, colour, drawDone);
 	always @(*) begin
 		position <= 4'd9 - semiNibblesUsed * 2'd2;
 	end
@@ -868,12 +897,13 @@ module scanToMorseLUT(scanCode, morseEncoding);
 	end
 endmodule
 
-module displayAllMorse(clk, reset, resetIndividual, morseCodes, lettersDone, x, y, colour, doneIndividual, doneAll);
+module displayAllMorse(clk, reset, resetIndividual, morseCodes, lettersDone, topY, x, y, colour, doneIndividual, doneAll);
 	parameter numLetters = 5;
 	parameter numLetterBits = numLetters * 10;
 	input clk, reset, resetIndividual;
 	input[numLetterBits-1:0] morseCodes;
 	input[3:0] lettersDone;
+	input[6:0] topY;
 	output [7:0] x;
 	output [6:0] y;
 	output [2:0] colour;
@@ -887,7 +917,7 @@ module displayAllMorse(clk, reset, resetIndividual, morseCodes, lettersDone, x, 
 	reg [7:0] curTopLeftX;
 	reg[3:0] counter;
 	reg[2:0] inColour;
-	displayMorse displayMorse1(clk, reset & resetIndividual, curMorse, curTopLeftX, 7'd5, inColour, x, y, colour, doneIndividual);
+	displayMorse displayMorse1(clk, reset & resetIndividual, curMorse, curTopLeftX, topY, inColour, x, y, colour, doneIndividual);
 
 	always @(*) begin
 		inColour <= (numLetters - counter -1'b1== lettersDone) ? 3'b100: 3'b111;
@@ -952,12 +982,13 @@ module displayMorse(clk, reset, morseCode, topLeftX, topLeftY, inColour, x, y, c
 	assign colour = curVal ? inColour : 3'b000;
 	assign done = (counter == 4'd0);
 endmodule
-module displayAllLetters(clk, reset, resetIndividual, letterCodes, lettersDone, x, y, colour, doneIndividual, doneAll);
+module displayAllLetters(clk, reset, resetIndividual, letterCodes, lettersDone, topY, x, y, colour, doneIndividual, doneAll);
 	parameter numLetters = 5;
 	parameter numLetterBits = numLetters * 6;
 	input clk, reset, resetIndividual;
 	input[numLetterBits-1:0] letterCodes;
 	input[3:0] lettersDone;
+	input[6:0] topY;
 	output [7:0] x;
 	output [6:0] y;
 	output [2:0] colour;
@@ -970,7 +1001,7 @@ module displayAllLetters(clk, reset, resetIndividual, letterCodes, lettersDone, 
 	reg [7:0] curTopLeftX;
 	reg[3:0] counter;
 	reg[2:0] inColour;
-	displayLetter displayLetter0(clk, reset & resetIndividual, curPattern, curTopLeftX, 7'd5, inColour, x, y, colour, doneIndividual);
+	displayLetter displayLetter0(clk, reset & resetIndividual, curPattern, curTopLeftX, topY, inColour, x, y, colour, doneIndividual);
 
 	always @(*) begin
 		inColour <= (numLetters - counter -1'b1== lettersDone) ? 3'b100: 3'b111;
@@ -1144,14 +1175,14 @@ module inputCounter(clk, reset, enableDash);
 			else begin
 				if(q + 1'b1 == 0) begin //overflow
 					// q <= 26'b10111110101111000010000000;
-					q <= 25'd10;
+					q <= 25'd5;
 				end
 				q <= q + 1'b1;
 
 			end
 		end
 	// assign enableDash = q >= 26'b10111110101111000010000000 ? 1'b1 : 1'b0;
-	assign enableDash = q >= 25'd10;
+	assign enableDash = q >= 25'd5;
 endmodule
 
 //modified from sample code
