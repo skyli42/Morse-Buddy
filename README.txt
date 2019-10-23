@@ -1,4 +1,5 @@
-MorseBuddy allows you to compete with a friend to test your ability to translate alphanumeric text to morse code, with display on the monitor and a singleplayer mode translating morse code to alphanumeric test.
+MorseBuddy allows you to compete with a friend to test your ability to translate alphanumeric text to morse code, with display on the monitor and a singleplayer mode translating morse code to alphanumeric test. It requires a FPGA board with Keyboard and VGA display support. MorseBuddy was made almost entirely in Verilog as the final project for CSC258, Summer 2019.
+
 
 Top level module: MorseBuddy (located in MorseBuddy.v)
 
